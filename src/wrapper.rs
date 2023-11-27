@@ -1,21 +1,17 @@
-use std::{env, path::{PathBuf, Path}, str::FromStr, fs::File, io::{Write, Read}};
+use std::{str::FromStr, fs::File, io::{Write, Read}};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
-use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::{JwkStorage, KeyId, JwsSignatureOptions}, verification::{jwk::Jwk, jws::Decoder, MethodRelationship}, document::{self, verifiable::JwsVerificationOptions}, credential::{Jws, Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils, JwtPresentationValidatorUtils, JwtValidationError}, did::{DID, DIDUrl, CoreDID}, core::{Timestamp, FromJson, ToJson, json, Object, OneOrMany}};
+use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jws, Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::{DID, DIDUrl}, core::{Timestamp, FromJson, ToJson, json, Object, OneOrMany}};
 use identity_iota::storage::JwkDocumentExt;
 use identity_iota::storage::Storage;
 use identity_iota::verification::MethodScope;
 use identity_iota::iota::IotaClientExt;
 use identity_iota::iota::IotaIdentityClientExt;
-
 use identity_iota::storage::JwkMemStore;
-use identity_iota::storage::KeyIdMemstore;
-
-
 use identity_iota::verification::jws::JwsAlgorithm;
 use identity_stronghold::StrongholdStorage;
-use iota_sdk::{client::{api::GetAddressesOptions, stronghold::{self, StrongholdAdapter}}, crypto::keys::bip39::Mnemonic, types::block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, Url};
+use iota_sdk::{client::{api::GetAddressesOptions, stronghold::StrongholdAdapter}, types::block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, Url};
 use iota_sdk::client::node_api::indexer::query_parameters::QueryParameter;
 use iota_sdk::client::secret::SecretManager;
 use iota_sdk::client::Client;
@@ -491,7 +487,7 @@ impl DidOperations {
 
   }
 
-  pub fn set_credential(&mut self, vc: &str) -> anyhow::Result<()>{
+  pub fn set_vc(&mut self, vc: &str) -> anyhow::Result<()>{
     self.vc = Some(Jwt::from(vc.to_owned()));
     Ok(())
   }

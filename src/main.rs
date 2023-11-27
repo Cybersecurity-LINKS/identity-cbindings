@@ -1,4 +1,4 @@
-use identity_iota::{verification::MethodRelationship, did::DID};
+use identity_iota::verification::MethodRelationship;
 use wrapper::DidOperations;
 
 #[tokio::main]
