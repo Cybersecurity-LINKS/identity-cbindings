@@ -3,31 +3,46 @@ use wrapper::DidOperations;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let operations = DidOperations::setup().await?;
 
-    let (document, fragment) = operations.create(MethodRelationship::Authentication).await?;
-    println!("DID document: {document:#}");
+    //Server
+    let mut operations_server = DidOperations::setup("./server.stronghold", "server").await?;
 
-    let (updated_document, fragment_2) = operations.update(document.id().as_str(), &fragment, MethodRelationship::Authentication).await?;
-    println!("Updated DID document: {updated_document:#}");
+    operations_server.create(MethodRelationship::Authentication).await?;
 
-    let resolved_document = operations.resolve(updated_document.id().as_str()).await?;
-    println!("Resolved DID document: {resolved_document:#}");
+    // operations_server.update(MethodRelationship::Authentication).await?;
 
-
-    let message = b"Message to be signed";
-
-    //TEST: This should fail, because the fragment is incorrect
-    operations.sign(message, &resolved_document, &fragment).await.expect_err("This should fail, wrong fragment!");
-
-    let jws = operations.sign(message, &resolved_document, &fragment_2).await?;
-    println!("JWS: {}", jws.as_str());
-
-    operations.verify(&jws, &resolved_document).await?;
+    //Should be done by OpenSSL
+    let (document, fragment) = DidOperations::read_did_document_from_file("did_document.json", "fragment")?;
+    
+    operations_server.set_did_document(&document, &fragment)?;
 
 
-    //Deactivate DID
-    operations.deactivate(resolved_document.id().as_str()).await?;
+    operations_server.vc_create("www.server.com").await?;
+
+    //read from file
+
+    let vc = DidOperations::read_vc_from_file("credential.jwt")?;
+
+    //send to client by OpenSSL
+
+
+    let message = b"CertificateVerify";
+
+    let jws = operations_server.sign(message).await?;
+
+
+    //Client
+    let mut operations_client = DidOperations::setup("./client.stronghold", "client").await?;
+
+    operations_client.vc_verify(&vc).await?;
+
+    operations_client.verify(&jws).await?;
+
+
+
+    //Deactivate server DID
+    operations_server.deactivate().await?;
     println!("DID Deactivated");
+
     Ok(())
 }

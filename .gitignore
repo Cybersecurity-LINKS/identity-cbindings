@@ -15,3 +15,9 @@ Cargo.lock
 
 
 .vscode
+
+client.stronghold
+server.stronghold
+credential.jwt
+did_document.json
+fragment
