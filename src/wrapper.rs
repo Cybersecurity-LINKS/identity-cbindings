@@ -188,13 +188,14 @@ impl DidOperations {
 
 
 
-  pub async fn sign(&self, message: &[u8]) -> anyhow::Result<Jws>{
+  pub async fn sign(&self, message: &[u8]) -> anyhow::Result<String>{
     let jws = self.did_document.as_ref().unwrap().create_jws(&self.storage, &self.fragment.as_ref().unwrap(), message, &JwsSignatureOptions::default()).await?;
-    Ok(jws)
+    Ok(jws.as_str().to_string())
   }
 
-  pub async fn verify(&self, jws: &Jws) -> anyhow::Result<()> {
-    let result = self.peer_did_document.as_ref().unwrap().verify_jws(jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
+  pub async fn verify(&self, jws: &str) -> anyhow::Result<()> {
+    let jws = Jws::new(jws.to_owned());
+    let result = self.peer_did_document.as_ref().unwrap().verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
 
     match result {
         Ok(_) => Ok(()), // Verification successful, return Ok
@@ -203,7 +204,7 @@ impl DidOperations {
   }
 
 
-  pub async fn create(&self, relationship: MethodRelationship) -> anyhow::Result<()>{
+  pub async fn create(&self) -> anyhow::Result<()>{
 
     // Create a new DID document with a placeholder DID.
     // The DID will be derived from the Alias Id of the Alias Output after publishing.
@@ -225,7 +226,7 @@ impl DidOperations {
     // Attach a new method relationship to the inserted method.
     document.attach_method_relationship(
       &document.id().to_url().join(format!("#{fragment}"))?,
-      relationship,
+      MethodRelationship::Authentication,
     )?;
 
 
@@ -259,7 +260,7 @@ impl DidOperations {
     Ok(())
   }
 
-  pub fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
+  fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
 
     // Create a new file, or truncate the existing file
     let mut file = File::create(file_path)?;
@@ -273,14 +274,8 @@ impl DidOperations {
     Ok(())
   }
 
-  pub fn set_my_did_document(&mut self, document: &str, fragment: &str) -> anyhow::Result<()> {
-    self.did_document = Some(IotaDocument::from_json(&document)?);
-    self.fragment = Some(fragment.to_owned());
-    Ok(())
-  }
 
-
-  pub async fn update(&mut self, relationship: MethodRelationship) -> anyhow::Result<()> {
+  pub async fn update(&mut self) -> anyhow::Result<()> {
     
     let (did_document, fragment) = Self::read_did_document_from_file("did_document.json", "fragment")?;
 
@@ -300,7 +295,7 @@ impl DidOperations {
     // Attach a new method relationship to the inserted method.
     did_document.attach_method_relationship(
       &did_document.id().to_url().join(format!("#{new_fragment}"))?,
-      relationship,
+      MethodRelationship::Authentication,
     )?;
 
     did_document.metadata.updated = Some(Timestamp::now_utc());
@@ -475,7 +470,7 @@ impl DidOperations {
   }
 
 
-  pub fn read_vc_from_file(vc_path: &str) -> anyhow::Result<String> {
+  fn read_vc_from_file(vc_path: &str) -> anyhow::Result<String> {
     // Open the document file
     let mut file = File::open(vc_path)?;
 
@@ -492,7 +487,7 @@ impl DidOperations {
     Ok(())
   }
 
-  pub fn read_did_document_from_file(document_path: &str, fragment_path: &str) -> anyhow::Result<(String, String)> {
+  fn read_did_document_from_file(document_path: &str, fragment_path: &str) -> anyhow::Result<(String, String)> {
     // Open the document file
     let mut file = File::open(document_path)?;
 

@@ -1,7 +1,8 @@
 [package]
-name = "iota-did"
+name = "identity_openssl"
 version = "0.1.0"
 edition = "2021"
+build = "src/build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -16,7 +17,15 @@ tokio = { version = "1.29", default-features = false, features = ["rt"] }
 env_logger = "0.10.0"
 dotenv = "0.15.0"
 
+[build-dependencies]
+cbindgen = "0.18.0"
 
 [lib]
-name = "wrapper"
-path = "src/wrapper.rs"
+crate-type = ["cdylib"]
+name = "identity_openssl"
+path = "src/lib.rs"
+
+
+[[example]]
+name = "main"
+path = "examples/main.rs"

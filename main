@@ -1,13 +1,17 @@
-use identity_iota::verification::MethodRelationship;
-use wrapper::DidOperations;
+// use identity_openssl::DidOperations;
+
+use identity_openssl::{wrapper, DidOperations};
+
+
+
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
 
     //Server
-    let mut operations_server = DidOperations::setup("./server.stronghold", "server").await?;
+    let mut operations_server = wrapper::DidOperations::setup("./server.stronghold", "server").await?;
 
-    operations_server.create(MethodRelationship::Authentication).await?;
+    operations_server.create().await?;
 
     // operations_server.update(MethodRelationship::Authentication).await?;
 
@@ -46,3 +50,4 @@ async fn main() -> anyhow::Result<()> {
 
     Ok(())
 }
+
