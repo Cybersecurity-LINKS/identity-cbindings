@@ -22,33 +22,20 @@ use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
 
 
-
-
-
-
-
 // --------------------------------------------------
 
-pub struct DidOperations {
+pub struct Wallet {
   client: Client,
   stronghold_storage: StrongholdStorage,
   address: Address,
   network: NetworkName,
-  storage: Storage<StrongholdStorage, StrongholdStorage>,
-
-
-  vc: Option<Jwt>,
-  did_document: Option<IotaDocument>, // did document server
-  fragment: Option<String>,
-  peer_did_document: Option<IotaDocument>
+  storage: Storage<StrongholdStorage, StrongholdStorage>
 }
 
-
-impl DidOperations {
+impl Wallet {
 
   pub const API_ENDPOINT: &str = "https://api.testnet.shimmer.network";
   pub const FAUCET_ENDPOINT: &str = "https://faucet.testnet.shimmer.network/api/enqueue";
-
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
     let client = Client::builder().with_primary_node(Self::API_ENDPOINT, None)?.finish().await?;
@@ -62,20 +49,16 @@ impl DidOperations {
     let network: NetworkName = client.network_name().await?;
     
     let storage: Storage<StrongholdStorage, StrongholdStorage> = Storage::new(stronghold_storage.clone(), stronghold_storage.clone());
-
-    // let storage: Storage<JwkMemStore, KeyIdMemstore> = Storage::<JwkMemStore, KeyIdMemstore>::new(JwkMemStore::new(), KeyIdMemstore::new());
-
-    Ok(Self { client, stronghold_storage, address, network, storage, vc: None, did_document: None, fragment: None, peer_did_document: None })
+    
+    Ok(Self { client, stronghold_storage, address, network, storage/* , vc: None, did_document: None, fragment: None, peer_did_document: None */ })
   }
 
 
-
-  
   async fn setup_secret_manager(stronghold_path: &str, password: &str) -> anyhow::Result<StrongholdAdapter> {
     // let path_exists = Path::new(&std::env::var("STRONGHOLD_SNAPSHOT_PATH").unwrap()).exists();
 
     // Setup Stronghold secret_manager
-    let secret_manager = StrongholdSecretManager::builder()
+  let secret_manager = StrongholdSecretManager::builder()
         .password(password.to_owned())
         .build(stronghold_path)?;
 
@@ -90,7 +73,7 @@ impl DidOperations {
   }
 
 
-  /// Generates an address from the given [`SecretManager`] and adds funds from the faucet.
+  // Generates an address from the given [`SecretManager`] and adds funds from the faucet.
   async fn request_funds_for_address(
     address: Option<&Bech32Address>,
     client: &Client,
@@ -185,36 +168,27 @@ impl DidOperations {
     Ok(total_amount)
   }
 
+}
 
+pub struct Did {
+  did_document: IotaDocument,
+  fragment: String
+}
 
-
-  pub async fn sign(&self, message: &[u8]) -> anyhow::Result<String>{
-    let jws = self.did_document.as_ref().unwrap().create_jws(&self.storage, &self.fragment.as_ref().unwrap(), message, &JwsSignatureOptions::default()).await?;
-    Ok(jws.as_str().to_string())
-  }
-
-  pub async fn verify(&self, jws: &str) -> anyhow::Result<()> {
-    let jws = Jws::new(jws.to_owned());
-    let result = self.peer_did_document.as_ref().unwrap().verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
-
-    match result {
-        Ok(_) => Ok(()), // Verification successful, return Ok
-        Err(err) => Err(anyhow::Error::msg(format!("JWS verification failed: {}", err))),
-    }
-  }
-
-
-  pub async fn create(&self) -> anyhow::Result<()>{
+impl Did {
+  
+  pub async fn did_create(wallet: &Wallet) -> anyhow::Result<Self>{
 
     // Create a new DID document with a placeholder DID.
     // The DID will be derived from the Alias Id of the Alias Output after publishing.
-    let mut document: IotaDocument = IotaDocument::new(&self.network);
+    //let mut document: IotaDocument = IotaDocument::new(&wallet.network);
+    let mut document = IotaDocument::new(&wallet.network);
 
-    
     // Insert a new Ed25519 verification method in the DID document.
+    //let fragment = document
     let fragment = document
     .generate_method(
-      &self.storage,
+      &wallet.storage,
       JwkMemStore::ED25519_KEY_TYPE,
       JwsAlgorithm::EdDSA,
       None,
@@ -222,42 +196,122 @@ impl DidOperations {
     )
     .await?;
 
-
     // Attach a new method relationship to the inserted method.
     document.attach_method_relationship(
-      &document.id().to_url().join(format!("#{fragment}"))?,
+      document.id().to_url().join(format!("#{fragment}"))?,
       MethodRelationship::Authentication,
     )?;
 
-
-      // Construct an Alias Output containing the DID document, with the wallet address
+    // Construct an Alias Output containing the DID document, with the wallet address
     // set as both the state controller and governor.
-    let alias_output: AliasOutput = self.client.new_did_output(self.address, document, None).await?;
+    let alias_output: AliasOutput = wallet.client.new_did_output(wallet.address, document, None).await?;
 
     // Publish the Alias Output and get the published DID document.
-    let document: IotaDocument = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), alias_output).await?;
-
-    let doc_json = document.to_json()?;
+    let did_document = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
+    let doc_json = did_document.to_json()?;
     
     Self::write_on_file(&doc_json, "did_document.json")?;
     Self::write_on_file(&fragment, "fragment")?;
 
-
-    Ok(())
+    Ok(Self { did_document, fragment })
 
   }
 
-
-  pub async fn resolve(&mut self, did: &str) -> anyhow::Result<()>{
+  pub async fn did_resolve(wallet: &mut Wallet, did: &str) -> anyhow::Result<Self>{
     let iota_did = IotaDID::from_str(did)?;
-    let document: IotaDocument = self.client.resolve_did(&iota_did).await?;
+    let did_document: IotaDocument = wallet.client.resolve_did(&iota_did).await?;
 
-    if document.metadata.deactivated.is_some_and(|v| v == true) {
+    if did_document.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
     }
-    self.peer_did_document = Some(document);
 
-    Ok(())
+    let fragment = String::from("Hello");
+    Ok(Self { did_document, fragment} )
+  }
+
+//   pub async fn update(&mut self) -> anyhow::Result<()> {
+    
+//     let (did_document, fragment) = Self::read_did_document_from_file("did_document.json", "fragment")?;
+
+//     let mut did_document = IotaDocument::from_json(&did_document)?;
+
+//     // Insert a new Ed25519 verification method in the DID document.
+//     let new_fragment: String = did_document
+//       .generate_method(
+//         &self.storage,
+//         JwkMemStore::ED25519_KEY_TYPE,
+//         JwsAlgorithm::EdDSA,
+//         None,
+//         MethodScope::VerificationMethod,
+//       )
+//       .await?;
+
+//     // Attach a new method relationship to the inserted method.
+//     did_document.attach_method_relationship(
+//       &did_document.id().to_url().join(format!("#{new_fragment}"))?,
+//       MethodRelationship::Authentication,
+//     )?;
+
+//     did_document.metadata.updated = Some(Timestamp::now_utc());
+
+//     // Remove a verification method.
+//     let original_method: DIDUrl = did_document.resolve_method(&fragment, None).unwrap().id().clone();
+//     did_document.purge_method(&self.storage, &original_method).await.unwrap();
+
+//     // Resolve the latest output and update it with the given document.
+//     let alias_output: AliasOutput = self.client.update_did_output(did_document.clone()).await?;
+
+//     // Because the size of the DID document increased, we have to increase the allocated storage deposit.
+//     // This increases the deposit amount to the new minimum.
+//     let rent_structure: RentStructure = self.client.get_rent_structure().await?;
+//     let alias_output: AliasOutput = AliasOutputBuilder::from(&alias_output)
+//       .with_minimum_storage_deposit(rent_structure)
+//       .finish()?;
+
+//     // Publish the updated Alias Output.
+//     let updated_document: IotaDocument = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), alias_output).await?;
+    
+//     let doc_json = updated_document.to_json()?;
+//     Self::write_on_file(&doc_json, "did_document.json")?;
+//     Self::write_on_file(&fragment, "fragment")?;
+
+//     Ok(())
+//   }
+
+//   pub async fn deactivate(&self) -> anyhow::Result<()> {
+//     let iota_did = match &self.did_document {
+//       Some(document) => document.id().clone(),
+//       None => return Err(anyhow!("Did Document NOT found!".to_owned())),
+//     };
+
+//     let deactivated_output: AliasOutput = self.client.deactivate_did_output(&iota_did).await?;
+
+//     // Optional: reduce and reclaim the storage deposit, sending the tokens to the state controller.
+//     let rent_structure = self.client.get_rent_structure().await?;
+//     let deactivated_output = AliasOutputBuilder::from(&deactivated_output)
+//       .with_minimum_storage_deposit(rent_structure)
+//       .finish()?;
+
+//     // Publish the deactivated DID document.
+//     let _ = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), deactivated_output).await?;
+
+//     Ok(())
+    
+//   }
+
+  pub async fn did_get(&self) -> anyhow::Result<String> {
+      //println!("DID DOCUMENT oe IN RUST {:?}", self.did_document.to_json()?.as_ptr());
+      Ok(self.did_document.to_json()?)
+  }
+
+  pub fn did_set(did_document: &str, fragment: &str) -> anyhow::Result<Self> {
+     let did_document = IotaDocument::from_json(did_document)?;
+     let fragment = fragment.to_owned();
+
+     //println!("setting DID Document: {}", did_document.to_json()?);
+     //println!("Setitng fragment: {}", fragment);
+
+     Ok(Self {did_document, fragment})
   }
 
   fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
@@ -274,90 +328,40 @@ impl DidOperations {
     Ok(())
   }
 
-
-  pub async fn update(&mut self) -> anyhow::Result<()> {
-    
-    let (did_document, fragment) = Self::read_did_document_from_file("did_document.json", "fragment")?;
-
-    let mut did_document = IotaDocument::from_json(&did_document)?;
-
-    // Insert a new Ed25519 verification method in the DID document.
-    let new_fragment: String = did_document
-      .generate_method(
-        &self.storage,
-        JwkMemStore::ED25519_KEY_TYPE,
-        JwsAlgorithm::EdDSA,
-        None,
-        MethodScope::VerificationMethod,
-      )
-      .await?;
-
-    // Attach a new method relationship to the inserted method.
-    did_document.attach_method_relationship(
-      &did_document.id().to_url().join(format!("#{new_fragment}"))?,
-      MethodRelationship::Authentication,
-    )?;
-
-    did_document.metadata.updated = Some(Timestamp::now_utc());
-
-    // Remove a verification method.
-    let original_method: DIDUrl = did_document.resolve_method(&fragment, None).unwrap().id().clone();
-    did_document.purge_method(&self.storage, &original_method).await.unwrap();
-
-    // Resolve the latest output and update it with the given document.
-    let alias_output: AliasOutput = self.client.update_did_output(did_document.clone()).await?;
-
-    // Because the size of the DID document increased, we have to increase the allocated storage deposit.
-    // This increases the deposit amount to the new minimum.
-    let rent_structure: RentStructure = self.client.get_rent_structure().await?;
-    let alias_output: AliasOutput = AliasOutputBuilder::from(&alias_output)
-      .with_minimum_storage_deposit(rent_structure)
-      .finish()?;
-
-    // Publish the updated Alias Output.
-    let updated_document: IotaDocument = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), alias_output).await?;
-    
-    let doc_json = updated_document.to_json()?;
-    Self::write_on_file(&doc_json, "did_document.json")?;
-    Self::write_on_file(&fragment, "fragment")?;
-
-    Ok(())
+  pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<String>{     
+    let jws = self.did_document.as_ref().create_jws(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
+    Ok(jws.as_str().to_string())
   }
 
-  
-  pub async fn deactivate(&self) -> anyhow::Result<()> {
-    let iota_did = match &self.did_document {
-      Some(document) => document.id().clone(),
-      None => return Err(anyhow!("Did Document NOT found!".to_owned())),
-    };
-
-    let deactivated_output: AliasOutput = self.client.deactivate_did_output(&iota_did).await?;
-
-    // Optional: reduce and reclaim the storage deposit, sending the tokens to the state controller.
-    let rent_structure = self.client.get_rent_structure().await?;
-    let deactivated_output = AliasOutputBuilder::from(&deactivated_output)
-      .with_minimum_storage_deposit(rent_structure)
-      .finish()?;
-
-    // Publish the deactivated DID document.
-    let _ = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), deactivated_output).await?;
-
-    Ok(())
+  pub async fn did_verify(&self, jws: &str) -> anyhow::Result<()> {
+      //let jws = Jws::new(jws.to_owned());
+      let result = self.did_document.as_ref()
+      .verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
     
+      match result {
+          Ok(_) => Ok(()), // Verification successful, return Ok
+          Err(err) => Err(anyhow::Error::msg(format!("JWS verification failed: {}", err))),
+      }     
   }
 
+}
 
-  pub async fn vc_create(&mut self, name: &str) -> anyhow::Result<()>{
-    //Create Issuer document
+pub struct VC {
+  vc: Jwt
+}
+
+impl VC {
+
+  pub async fn vc_create(wallet: &mut Wallet, did: &Did, name: &str) -> anyhow::Result<Self>{
+    // Create Issuer document
     // Create a new DID document with a placeholder DID.
     // The DID will be derived from the Alias Id of the Alias Output after publishing.
-    let mut issuer_document: IotaDocument = IotaDocument::new(&self.network);
-
-    
+    let mut issuer_document: IotaDocument = IotaDocument::new(&wallet.network);
+ 
     // Insert a new Ed25519 verification method in the DID document.
     let fragment_issuer = issuer_document
     .generate_method(
-      &self.storage,
+      &wallet.storage,
       JwkMemStore::ED25519_KEY_TYPE,
       JwsAlgorithm::EdDSA,
       None,
@@ -365,25 +369,21 @@ impl DidOperations {
     )
     .await?;
 
-
     // Attach a new method relationship to the inserted method.
     issuer_document.attach_method_relationship(
       &issuer_document.id().to_url().join(format!("#{fragment_issuer}"))?,
       MethodRelationship::AssertionMethod,
     )?;
 
-
-      // Construct an Alias Output containing the DID document, with the wallet address
+    // Construct an Alias Output containing the DID document, with the wallet address
     // set as both the state controller and governor.
-    let alias_output: AliasOutput = self.client.new_did_output(self.address, issuer_document, None).await?;
+    let alias_output: AliasOutput = wallet.client.new_did_output(wallet.address, issuer_document, None).await?;
 
     // Publish the Alias Output and get the published DID document.
-    let issuer_document: IotaDocument = self.client.publish_did_output(self.stronghold_storage.as_secret_manager(), alias_output).await?;
-
-
+    let issuer_document: IotaDocument = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
 
     let subject: Subject = Subject::from_json_value(json!({
-      "id": self.did_document.as_ref().unwrap().id().to_string(),
+      "id": did.did_document.as_ref().id().to_string(),
       "name": name
     }))?;
   
@@ -398,28 +398,26 @@ impl DidOperations {
     let credential_jwt: Jwt = issuer_document
       .create_credential_jwt(
         &credential,
-        &self.storage,
+        &wallet.storage,
         &fragment_issuer,
         &JwsSignatureOptions::default(),
         None,
       )
       .await?;
   
-    self.vc = Some(credential_jwt.clone());
+    let vc = credential_jwt.clone();
     Self::write_on_file(credential_jwt.as_str(), "credential.jwt")?;
 
-    Ok(())
+    Ok(Self {vc})
   }
 
-
-
-  pub async fn vc_verify(&mut self, peer_vc: &str) -> anyhow::Result<()> {
+  pub async fn vc_verify(wallet: &Wallet, peer_vc: &str) -> anyhow::Result<Did> {
 
     let vc = Jwt::from(peer_vc.to_owned());
 
     let issuer: IotaDID = JwtCredentialValidatorUtils::extract_issuer_from_jwt(&vc)?;
 
-    let issuer_document: IotaDocument = self.client.resolve_did(&issuer).await?;
+    let issuer_document: IotaDocument = wallet.client.resolve_did(&issuer).await?;
 
     if issuer_document.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
@@ -452,71 +450,42 @@ impl DidOperations {
         None => return Err(anyhow!("holder DID not found!".to_owned())),
     };
 
-    let peer_did_doc: IotaDocument = self.client.resolve_did(&peer_did).await?;
+    let peer_did_doc: IotaDocument = wallet.client.resolve_did(&peer_did).await?;
     if peer_did_doc.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
     }
 
-    self.peer_did_document = Some(peer_did_doc);
+    let fragment = String::from("Hello");
+    let peer_did = Did {did_document : peer_did_doc, fragment : fragment};
 
-    Ok(())
+    Ok(peer_did)
   }
 
-  pub fn get_vc(&self) -> anyhow::Result<&str> {
-    match &self.vc {
-        Some(vc) => Ok(vc.as_str()),
-        None => return Err(anyhow!("VC NOT found")),
-    }
+  pub fn vc_get(&self) -> anyhow::Result<String> {
+    Ok(self.vc.as_str().to_string())
   }
 
-
-  fn read_vc_from_file(vc_path: &str) -> anyhow::Result<String> {
-    // Open the document file
-    let mut file = File::open(vc_path)?;
-
-    // Read the document into a String
-    let mut vc = String::new();
-    file.read_to_string(&mut vc)?;
-
-    Ok(vc)
-
+  pub fn vc_set(vc: &str) -> anyhow::Result<Self>{
+    let vc = Jwt::from(vc.to_owned());
+    Ok(Self {vc})
   }
 
-  pub fn set_vc(&mut self, vc: &str) -> anyhow::Result<()>{
-    self.vc = Some(Jwt::from(vc.to_owned()));
-    Ok(())
-  }
+  fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
 
-  fn read_did_document_from_file(document_path: &str, fragment_path: &str) -> anyhow::Result<(String, String)> {
-    // Open the document file
-    let mut file = File::open(document_path)?;
+    // Create a new file, or truncate the existing file
+    let mut file = File::create(file_path)?;
 
-    // Read the document into a String
-    let mut document = String::new();
-    file.read_to_string(&mut document)?;
+    // Write the data to the file
+    file.write_all(data.as_bytes())?;
 
-    // self.did_document = Some(IotaDocument::from_json(&document)?);
-
-
-    // Open the fragment file
-    let mut file = File::open(fragment_path)?;
-
-    // Read the fragment into a String
-    let mut fragment = String::new();
-    file.read_to_string(&mut fragment)?;
-
-    // self.fragment = Some(fragment);
-
-    Ok((document, fragment))
-  }
-
-
-  
-  pub fn set_did_document(&mut self, did_document: &str, fragment: &str) -> anyhow::Result<()> {
-    self.did_document = Some(IotaDocument::from_json(did_document)?);
-    self.fragment = Some(fragment.to_owned());
+    // Flush the buffer to ensure the data is written immediately
+    file.flush()?;
 
     Ok(())
   }
 
 }
+
+
+  
+

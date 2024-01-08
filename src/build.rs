@@ -11,5 +11,5 @@ fn main() {
         .with_config(config)
         .generate()
         .expect("Cannot generate header file!")
-        .write_to_file("../identity-bin/headers/identity.h");
+        .write_to_file("header-binding/identity.h");
 }
