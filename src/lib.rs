@@ -2,7 +2,6 @@ pub mod wrapper;
 
 use std::ffi::{c_char, CStr, CString};
 
-use identity_iota::credential::Jws;
 pub use wrapper::*;
 
 #[repr(C)]
@@ -67,11 +66,11 @@ pub extern "C" fn deactivate(did_op: &mut DidOperations) -> rvalue_t {
 } */
 
 #[no_mangle]
-pub extern "C" fn did_get(did: &Did) -> *const c_char {
+pub extern "C" fn get_did(did: &Did) -> *const c_char {
     let runtime = tokio::runtime::Runtime::new().unwrap();
-    match runtime.block_on(Did::did_get(did)) {
+    match runtime.block_on(Did::get_did(did)) {
         Ok(did_doc) => {
-            let c_string = CString::new(did_doc).expect("CString::new failed");
+            let c_string = CString::new(DID_OID.to_owned() + " " + &did_doc).expect("CString::new failed");
             c_string.into_raw()},
         Err(_) => std::ptr::null(),
     }
@@ -87,11 +86,11 @@ pub unsafe extern fn free_did(ptr: *const c_char) {
 } */
 
 #[no_mangle]
-pub extern "C" fn did_set(document: *const c_char, fragment: *const c_char) -> *mut Did {
+pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char) -> *mut Did {
     let document = unsafe { CStr::from_ptr(document).to_str().unwrap() };
     let fragment = unsafe { CStr::from_ptr(fragment).to_str().unwrap() };
     
-    match Did::did_set(document, fragment) {
+    match Did::set_did(document, fragment) {
         Ok(did) => Box::into_raw(Box::new(did)),
         Err(_) => std::ptr::null_mut(),
     }
@@ -127,44 +126,44 @@ pub extern "C" fn did_verify(did: &Did, jws: *const c_char) -> rvalue_t {
 /* VC */
 
 #[no_mangle]
-pub extern "C" fn vc_create(wallet: &mut Wallet, did: &Did, name: *const c_char) -> *mut VC {
-    let runtime = tokio::runtime::Runtime::new().unwrap();
+pub extern "C" fn vc_create(wallet: &mut Wallet, did: &Did, name: *const c_char) -> *mut Vc {
     let name = unsafe { CStr::from_ptr(name).to_str().unwrap() };
 
-    match runtime.block_on(VC::vc_create(wallet, did, name)) {
-        Ok(vc) => Box::into_raw(Box::new(vc)),
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    match runtime.block_on(Vc::vc_create(wallet, did, name, )) {
+        Ok(identity) => Box::into_raw(Box::new(identity)),
         Err(_) => std::ptr::null_mut(),
     }
 }
+
 
 #[no_mangle]
 pub extern "C" fn vc_verify(wallet: &Wallet, peer_vc: *const c_char) -> *mut Did {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let peer_vc = unsafe { CStr::from_ptr(peer_vc).to_str().unwrap() };
 
-    match runtime.block_on(VC::vc_verify(wallet, peer_vc)) {
+    match runtime.block_on(Vc::vc_verify(wallet, peer_vc)) {
         Ok(did) => Box::into_raw(Box::new(did)),
         Err(_) => std::ptr::null_mut(),
     }
 }
 
 #[no_mangle]
-pub extern "C" fn vc_get(vc: &VC) -> *const c_char {
-    match VC::vc_get(vc) {
+pub extern "C" fn get_vc(vc: &Vc) -> *const c_char {
+    match Vc::get_vc(vc) {
         Ok(vc) => {
-        let c_vc = CString::new(vc).expect("CString::new failed");
+        let c_vc = CString::new(VC_OID.to_owned() + " " + &vc).expect("CString::new failed");
         c_vc.into_raw()},
         Err(_) => std::ptr::null(),
     }
 }
 
 #[no_mangle]
-pub extern "C" fn vc_set(vc_jwt: *const c_char) -> *mut VC {
+pub extern "C" fn set_vc(vc_jwt: *const c_char) -> *mut Vc {
     let vc = unsafe { CStr::from_ptr(vc_jwt).to_str().unwrap() };
     
-    match VC::vc_set(vc) {
+    match Vc::set_vc(vc) {
         Ok(vc) => Box::into_raw(Box::new(vc)),
         Err(_) => std::ptr::null_mut(),
     }
 }
-

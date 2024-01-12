@@ -1,8 +1,8 @@
-use std::{str::FromStr, fs::File, io::{Write, Read}};
+use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
-use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jws, Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::{DID, DIDUrl}, core::{Timestamp, FromJson, ToJson, json, Object, OneOrMany}};
+use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
 use identity_iota::storage::JwkDocumentExt;
 use identity_iota::storage::Storage;
 use identity_iota::verification::MethodScope;
@@ -11,7 +11,7 @@ use identity_iota::iota::IotaIdentityClientExt;
 use identity_iota::storage::JwkMemStore;
 use identity_iota::verification::jws::JwsAlgorithm;
 use identity_stronghold::StrongholdStorage;
-use iota_sdk::{client::{api::GetAddressesOptions, stronghold::StrongholdAdapter}, types::block::output::{AliasOutput, RentStructure, AliasOutputBuilder}, Url};
+use iota_sdk::{client::{api::GetAddressesOptions, stronghold::StrongholdAdapter}, types::block::output::AliasOutput, Url};
 use iota_sdk::client::node_api::indexer::query_parameters::QueryParameter;
 use iota_sdk::client::secret::SecretManager;
 use iota_sdk::client::Client;
@@ -23,6 +23,9 @@ use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
 
 
 // --------------------------------------------------
+
+pub const DID_OID: &str = "1.2.840.20000.1.1";
+pub const VC_OID: &str = "1.2.840.30000.1.1";
 
 pub struct Wallet {
   client: Client,
@@ -210,8 +213,7 @@ impl Did {
     let did_document = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
     let doc_json = did_document.to_json()?;
     
-    Self::write_on_file(&doc_json, "did_document.json")?;
-    Self::write_on_file(&fragment, "fragment")?;
+    Self::write_on_file(DID_OID, &fragment.as_str(), &doc_json, "did_document.json")?;
 
     Ok(Self { did_document, fragment })
 
@@ -299,12 +301,13 @@ impl Did {
     
 //   }
 
-  pub async fn did_get(&self) -> anyhow::Result<String> {
-      //println!("DID DOCUMENT oe IN RUST {:?}", self.did_document.to_json()?.as_ptr());
-      Ok(self.did_document.to_json()?)
+  pub async fn get_did(&self) -> anyhow::Result<String> {
+
+      println!("Ayo: {} {}", self.fragment.to_owned(), &self.did_document.to_json()?);
+      Ok(self.fragment.to_owned() + " " + &self.did_document.to_json()?)
   }
 
-  pub fn did_set(did_document: &str, fragment: &str) -> anyhow::Result<Self> {
+  pub fn set_did(did_document: &str, fragment: &str) -> anyhow::Result<Self> {
      let did_document = IotaDocument::from_json(did_document)?;
      let fragment = fragment.to_owned();
 
@@ -314,13 +317,17 @@ impl Did {
      Ok(Self {did_document, fragment})
   }
 
-  fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
+  fn write_on_file(oid: &str, fragment: &str, did_document: &str, file_path: &str) -> anyhow::Result<()> {
 
     // Create a new file, or truncate the existing file
     let mut file = File::create(file_path)?;
 
     // Write the data to the file
-    file.write_all(data.as_bytes())?;
+    file.write_all(oid.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(fragment.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(did_document.as_bytes())?;
 
     // Flush the buffer to ensure the data is written immediately
     file.flush()?;
@@ -346,13 +353,14 @@ impl Did {
 
 }
 
-pub struct VC {
+pub struct Vc {
   vc: Jwt
 }
 
-impl VC {
+impl Vc {
 
   pub async fn vc_create(wallet: &mut Wallet, did: &Did, name: &str) -> anyhow::Result<Self>{
+        
     // Create Issuer document
     // Create a new DID document with a placeholder DID.
     // The DID will be derived from the Alias Id of the Alias Output after publishing.
@@ -406,7 +414,7 @@ impl VC {
       .await?;
   
     let vc = credential_jwt.clone();
-    Self::write_on_file(credential_jwt.as_str(), "credential.jwt")?;
+    Self::write_on_file(VC_OID,credential_jwt.as_str(), "credential.jwt")?;
 
     Ok(Self {vc})
   }
@@ -461,22 +469,24 @@ impl VC {
     Ok(peer_did)
   }
 
-  pub fn vc_get(&self) -> anyhow::Result<String> {
+  pub fn get_vc(&self) -> anyhow::Result<String> {
     Ok(self.vc.as_str().to_string())
   }
 
-  pub fn vc_set(vc: &str) -> anyhow::Result<Self>{
+  pub fn set_vc(vc: &str) -> anyhow::Result<Self>{
     let vc = Jwt::from(vc.to_owned());
     Ok(Self {vc})
   }
 
-  fn write_on_file(data: &str, file_path: &str) -> anyhow::Result<()> {
+  fn write_on_file(oid: &str, vc: &str, file_path: &str) -> anyhow::Result<()> {
 
     // Create a new file, or truncate the existing file
     let mut file = File::create(file_path)?;
 
     // Write the data to the file
-    file.write_all(data.as_bytes())?;
+    file.write_all(oid.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(vc.as_bytes())?;
 
     // Flush the buffer to ensure the data is written immediately
     file.flush()?;

@@ -84,9 +84,9 @@ int main() {
     VC *vc2 = vc_set(vc_jwt2); */
 
     /* VERIFY THE VC */
-    Did *peer_did = vc_verify(w, vc_jwt);
+    /* Did *peer_did = vc_verify(w, vc_jwt);
     const char *peer_did_document = did_get(peer_did);
-    printf("\nThe content of the peer DID document: %s\n", peer_did_document);
+    printf("\nThe content of the peer DID document: %s\n", peer_did_document); */
 
     return 0;
 }
