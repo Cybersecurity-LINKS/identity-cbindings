@@ -337,17 +337,23 @@ impl Did {
 
   pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<String>{     
     let jws = self.did_document.as_ref().create_jws(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
+    println!("Signature length: {}", jws.as_str().to_string().len());
+    println!("JWT: {}", jws.as_str().to_string());
     Ok(jws.as_str().to_string())
   }
 
   pub async fn did_verify(&self, jws: &str) -> anyhow::Result<()> {
       //let jws = Jws::new(jws.to_owned());
+      println!("qui c'è {}", &self.did_document.to_json()?);
+      println!("{}", jws);
       let result = self.did_document.as_ref()
       .verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
     
       match result {
-          Ok(_) => Ok(()), // Verification successful, return Ok
-          Err(err) => Err(anyhow::Error::msg(format!("JWS verification failed: {}", err))),
+          Ok(_) => { println!("Success!\n");
+            Ok(())}, // Verification successful, return Ok
+          Err(err) => { println!("Error\n");
+            Err(anyhow::Error::msg(format!("JWS verification failed: {}", err)))},
       }     
   }
 

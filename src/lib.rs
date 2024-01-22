@@ -1,7 +1,8 @@
 pub mod wrapper;
 
-use std::ffi::{c_char, CStr, CString};
+use std::{ffi::{c_char, CStr, CString}, fmt::format};
 
+use identity_iota::core::{json, ToJson};
 pub use wrapper::*;
 
 #[repr(C)]
@@ -97,18 +98,22 @@ pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char) -> *
 }
 
 #[no_mangle]
-pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message_len: usize) -> *const c_char {
+pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message_len: usize) -> *mut c_char {
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
     let message = unsafe {
         std::slice::from_raw_parts(message, message_len)
     };
 
-    match runtime.block_on(Did::did_sign(did, wallet, message)) {
+    let tbs = json!({"tbs": message});
+    let tbs_slice = tbs.to_json_vec().expect("json to vec failed");
+    let slice = tbs_slice.as_slice();
+
+    match runtime.block_on(Did::did_sign(did, wallet, slice)) {
         Ok(jws) => {
             let c_string = CString::new(jws).expect("CString::new failed");
             c_string.into_raw()},
-        Err(_) => std::ptr::null(),
+        Err(_) => std::ptr::null_mut(),
     }
 }
 
@@ -116,10 +121,11 @@ pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message
 pub extern "C" fn did_verify(did: &Did, jws: *const c_char) -> rvalue_t {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let jws = unsafe { CStr::from_ptr(jws).to_str().unwrap() };
+    println!("prima {}", jws);
 
     match runtime.block_on(Did::did_verify(did, jws)) {
-        Ok(_) => rvalue_t{ code: 0 },
-        Err(_) => rvalue_t{ code: 1 },
+        Ok(_) => rvalue_t{ code: 1 },
+        Err(_) => rvalue_t{ code: 0 },
     }
 }
 
