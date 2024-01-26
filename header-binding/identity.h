@@ -1,6 +1,3 @@
-#ifndef IDENTITY_H
-# define IDENTITY_H
-
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -44,5 +41,3 @@ struct Did *vc_verify(const struct Wallet *wallet, const char *peer_vc);
 const char *get_vc(const struct Vc *vc);
 
 struct Vc *set_vc(const char *vc_jwt);
-
-#endif
