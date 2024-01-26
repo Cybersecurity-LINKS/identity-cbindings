@@ -1,3 +1,8 @@
+/* 
+ * cbindgen User Guide 
+ * at https://github.com/mozilla/cbindgen/blob/master/docs.md 
+ */
+
 extern crate cbindgen;
 use std::env;
 use std::path::Path;
