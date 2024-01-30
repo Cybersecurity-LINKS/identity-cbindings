@@ -1,3 +1,20 @@
+/*
+ * Copyright 2024 Fondazione LINKS.
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.	
+ *
+ */
+
 #include <stdio.h>
 #include "identity.h"
 #include <string.h>
@@ -51,26 +68,26 @@ int main() {
     printf("\nDID Document: %s\n", did_document);
 
     /* SIGN AN ARBITRARY MESSAGE WITH THE DID KEY */
-    /* char s[] = "Hello";
+    char s[] = "Hello";
     const char *sign = did_sign(w, did, (unsigned char*)s, strlen(s));
-    printf("Signature: %s\n", sign); */
+    printf("Signature: %s\n", sign);
 
     /* RESOLVE THE DID */
     //TODO 
     // I should read the DID Document id from the file
-    /* did = did_resolve(w, "did:iota:rms:0xf66b6e320a8b794c473003cebb6534970e63d953029d0bbf48f29168aef2e079"); */
+    did = did_resolve(w, "did:iota:rms:0xf66b6e320a8b794c473003cebb6534970e63d953029d0bbf48f29168aef2e079");
     
     /* VERIFY THE SIGNATURE */
     //TODO
-    /* rvalue_t ret = did_verify(did, signature);
-    printf("return code: %d\n", ret.code); */
+    rvalue_t ret = did_verify(did, signature);
+    printf("return code: %d\n", ret.code);
 
     /* READ A DID DOCUMENT FROM FILE AND SET IT */
-    /* char* document = read_file("did_document.json");
+    char* document = read_file("did_document.json");
     char* fragment = read_file("fragment");
     Did *did2 = did_set(did_document, fragment);
     const char *did_document2 = did_get(did2);
-    printf("The content of the set DID Document: %s\n", did_document2); */
+    printf("The content of the set DID Document: %s\n", did_document2);
 
     /* CREATE A VC */
     VC *vc = vc_create(w, did, "www.server.com");
@@ -80,13 +97,13 @@ int main() {
     printf("\nVC as JWT:\n %s", vc_jwt);
 
     /* READ VC FROM FILE AND SET IT */
-    /* char* vc_jwt2 = read_file("credential.jwt");
-    VC *vc2 = vc_set(vc_jwt2); */
+    char* vc_jwt2 = read_file("credential.jwt");
+    VC *vc2 = vc_set(vc_jwt2);
 
     /* VERIFY THE VC */
-    /* Did *peer_did = vc_verify(w, vc_jwt);
+    Did *peer_did = vc_verify(w, vc_jwt);
     const char *peer_did_document = did_get(peer_did);
-    printf("\nThe content of the peer DID document: %s\n", peer_did_document); */
+    printf("\nThe content of the peer DID document: %s\n", peer_did_document);
 
     return 0;
 }

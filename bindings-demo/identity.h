@@ -32,7 +32,7 @@ char *did_sign(const struct Wallet *wallet,
                uint8_t *message,
                uintptr_t message_len);
 
-struct rvalue_t did_verify(const struct Did *did, const char *jws);
+struct rvalue_t did_verify(const struct Did *did, const char *jws, uint8_t *tbv, uintptr_t tbv_len);
 
 struct Vc *vc_create(struct Wallet *wallet, const struct Did *did, const char *name);
 

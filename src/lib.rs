@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Fondazione LINKS
+ * Copyright 2024 Fondazione LINKS.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -135,12 +135,19 @@ pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message
 }
 
 #[no_mangle]
-pub extern "C" fn did_verify(did: &Did, jws: *const c_char) -> rvalue_t {
+pub extern "C" fn did_verify(did: &Did, jws: *const c_char, tbv: *mut u8, tbv_len: usize) -> rvalue_t {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let jws = unsafe { CStr::from_ptr(jws).to_str().unwrap() };
-    println!("prima {}", jws);
 
-    match runtime.block_on(Did::did_verify(did, jws)) {
+    let message = unsafe {
+        std::slice::from_raw_parts(tbv, tbv_len)
+    };
+
+    let tbs = json!({"tbs": message});
+    let tbs_slice = tbs.to_json_vec().expect("json to vec failed");
+    let slice = tbs_slice.as_slice();
+
+    match runtime.block_on(Did::did_verify(did, jws, slice)) {
         Ok(_) => rvalue_t{ code: 1 },
         Err(_) => rvalue_t{ code: 0 },
     }

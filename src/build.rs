@@ -16,5 +16,5 @@ fn main() {
         .with_config(config)
         .generate()
         .expect("Cannot generate header file!")
-        .write_to_file("header-binding/identity.h");
+        .write_to_file("bindings-demo/identity.h");
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Fondazione LINKS
+ * Copyright 2024 Fondazione LINKS.
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
+use identity_iota::core::Value;
 use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
 use identity_iota::storage::JwkDocumentExt;
 use identity_iota::storage::Storage;
@@ -37,7 +38,6 @@ use iota_sdk::types::block::address::Address;
 use iota_sdk::types::block::address::Bech32Address;
 use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
-
 
 // --------------------------------------------------
 
@@ -229,8 +229,6 @@ impl Did {
     // Publish the Alias Output and get the published DID document.
     let did_document = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
     let doc_json = did_document.to_json()?;
-
-    println!{"creating did document {}", doc_json};
     
     Self::write_on_file(DID_OID, &fragment.as_str(), &doc_json, "did_document.json")?;
 
@@ -321,17 +319,12 @@ impl Did {
 //   }
 
   pub async fn get_did(&self) -> anyhow::Result<String> {
-
-      println!("Ayo: {} {}", self.fragment.to_owned(), &self.did_document.to_json()?);
       Ok(self.fragment.to_owned() + " " + &self.did_document.to_json()?)
   }
 
   pub fn set_did(did_document: &str, fragment: &str) -> anyhow::Result<Self> {
      let did_document = IotaDocument::from_json(did_document)?;
      let fragment = fragment.to_owned();
-
-     //println!("setting DID Document: {}", did_document.to_json()?);
-     //println!("Setitng fragment: {}", fragment);
 
      Ok(Self {did_document, fragment})
   }
@@ -356,22 +349,22 @@ impl Did {
 
   pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<String>{     
     let jws = self.did_document.as_ref().create_jws(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
-    println!("Signature length: {}", jws.as_str().to_string().len());
-    println!("JWT: {}", jws.as_str().to_string());
     Ok(jws.as_str().to_string())
   }
 
-  pub async fn did_verify(&self, jws: &str) -> anyhow::Result<()> {
-      //let jws = Jws::new(jws.to_owned());
-      println!("qui c'è {}", &self.did_document.to_json()?);
-      println!("{}", jws);
+  pub async fn did_verify(&self, jws: &str, tbv: &[u8]) -> anyhow::Result<()> {
       let result = self.did_document.as_ref()
       .verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
     
       match result {
-          Ok(_) => { println!("Success!\n");
-            Ok(())}, // Verification successful, return Ok
-          Err(err) => { println!("Error\n");
+          Ok(payload) => {
+            if payload.claims == tbv {
+              Ok(())
+            } else {
+              Err(anyhow::Error::msg(format!("JWS payload comparison failed")))
+            } 
+          }, // Verification successful, return Ok
+          Err(err) => {
             Err(anyhow::Error::msg(format!("JWS verification failed: {}", err)))},
       }     
   }

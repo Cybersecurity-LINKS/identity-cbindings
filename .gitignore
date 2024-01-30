@@ -13,11 +13,14 @@ Cargo.lock
 # MSVC Windows builds of rustc generate these, which store debugging information
 *.pdb
 
-
 .vscode
 
-client.stronghold
-server.stronghold
+.settings/
+.cproject
+.project
+client.stronghold*
+server.stronghold*
 credential.jwt
 did_document.json
 fragment
+main
