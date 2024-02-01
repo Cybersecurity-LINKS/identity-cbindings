@@ -15,12 +15,12 @@
  *
  */
 
-pub mod wrapper;
+pub mod identity_wrapper;
 
-use std::{ffi::{c_char, CStr, CString}, fmt::format};
+use std::ffi::{c_char, CStr, CString};
 
 use identity_iota::core::{json, ToJson};
-pub use wrapper::*;
+pub use identity_wrapper::*;
 
 #[repr(C)]
 pub struct rvalue_t {

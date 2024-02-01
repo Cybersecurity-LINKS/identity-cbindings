@@ -24,3 +24,4 @@ credential.jwt
 did_document.json
 fragment
 main
+identity.h

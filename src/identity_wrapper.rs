@@ -19,7 +19,6 @@ use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
-use identity_iota::core::Value;
 use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
 use identity_iota::storage::JwkDocumentExt;
 use identity_iota::storage::Storage;
@@ -54,8 +53,8 @@ pub struct Wallet {
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &str = "https://api.testnet.shimmer.network";
-  pub const FAUCET_ENDPOINT: &str = "https://faucet.testnet.shimmer.network/api/enqueue";
+  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
+  pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
     let client = Client::builder().with_primary_node(Self::API_ENDPOINT, None)?.finish().await?;

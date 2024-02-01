@@ -64,7 +64,7 @@ int main() {
     
     /* CREATE A DID DOCUMENT */
     Did *did = did_create(w);
-    const char *did_document = did_get(did);
+    const char *did_document = get_did(did);
     printf("\nDID Document: %s\n", did_document);
 
     /* SIGN AN ARBITRARY MESSAGE WITH THE DID KEY */
@@ -79,30 +79,28 @@ int main() {
     
     /* VERIFY THE SIGNATURE */
     //TODO
-    rvalue_t ret = did_verify(did, signature);
-    printf("return code: %d\n", ret.code);
 
     /* READ A DID DOCUMENT FROM FILE AND SET IT */
     char* document = read_file("did_document.json");
     char* fragment = read_file("fragment");
-    Did *did2 = did_set(did_document, fragment);
-    const char *did_document2 = did_get(did2);
+    Did *did2 = set_did(did_document, fragment);
+    const char *did_document2 = get_did(did2);
     printf("The content of the set DID Document: %s\n", did_document2);
 
     /* CREATE A VC */
-    VC *vc = vc_create(w, did, "www.server.com");
+    Vc *vc = vc_create(w, did, "www.server.com");
 
     /* GET THE VC AS A JWT */
-    const char* vc_jwt = vc_get(vc);
+    const char* vc_jwt = get_vc(vc);
     printf("\nVC as JWT:\n %s", vc_jwt);
 
     /* READ VC FROM FILE AND SET IT */
     char* vc_jwt2 = read_file("credential.jwt");
-    VC *vc2 = vc_set(vc_jwt2);
+    Vc *vc2 = set_vc(vc_jwt2);
 
     /* VERIFY THE VC */
     Did *peer_did = vc_verify(w, vc_jwt);
-    const char *peer_did_document = did_get(peer_did);
+    const char *peer_did_document = get_did(peer_did);
     printf("\nThe content of the peer DID document: %s\n", peer_did_document);
 
     return 0;
