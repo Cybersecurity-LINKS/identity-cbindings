@@ -94,14 +94,11 @@ pub extern "C" fn get_did(did: &Did) -> *const c_char {
     }
 }
 
-//TODO
-/// # Safety
-/// The ptr should be a valid pointer to the string allocated by rust
-/* #[no_mangle]
-pub unsafe extern fn free_did(ptr: *const c_char) {
+#[no_mangle]
+pub unsafe extern fn free_string(ptr: *const c_char) {
     // Take the ownership back to rust and drop the owner
     let _ = CString::from_raw(ptr as *mut _);
-} */
+}
 
 #[no_mangle]
 pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char) -> *mut Did {

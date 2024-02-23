@@ -21,10 +21,8 @@ struct Did *did_resolve(struct Wallet *wallet, const char *did);
 
 const char *get_did(const struct Did *did);
 
-/**
- * # Safety
- * The ptr should be a valid pointer to the string allocated by rust
- */
+void free_string(const char *ptr);
+
 struct Did *set_did(const char *document, const char *fragment);
 
 char *did_sign(const struct Wallet *wallet,

@@ -60,6 +60,10 @@ int main() {
     
     /* WALLET SETUP */
     Wallet *w = setup("./server.stronghold", "server");
+    if(w == NULL) {
+        fprintf(stderr, "Error setting up the wallet\n");
+        return -1;
+    }
     printf("Done setting up the wallet \n");
     
     /* CREATE A DID DOCUMENT */

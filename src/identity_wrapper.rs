@@ -53,12 +53,17 @@ pub struct Wallet {
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
+  pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
   pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
-    let client = Client::builder().with_primary_node(Self::API_ENDPOINT, None)?.finish().await?;
+    let client_2 = Client::builder().with_primary_node(Self::API_ENDPOINT, None)?.finish().await;
 
+    let client = match client_2 {
+      Ok(c) => c,
+      Err(error) => panic!("Problem: {:?}", error)
+    };
+    
     let stronghold = Self::setup_secret_manager(stronghold_path, password).await?;
     let stronghold_storage = StrongholdStorage::new(stronghold);
     
