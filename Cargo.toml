@@ -17,6 +17,20 @@ tokio = { version = "1.29", default-features = false, features = ["rt"] }
 env_logger = "0.10.0"
 dotenv = "0.15.0"
 
+[patch.crates-io]
+identity_stronghold = { path = "../identity.rs-1/identity_stronghold" }
+identity_core = { path = "../identity.rs-1/identity_core" }
+identity_jose = { path = "../identity.rs-1/identity_jose" }
+identity_did = { path = "../identity.rs-1/identity_did" }
+identity_verification = { path = "../identity.rs-1/identity_verification" }
+identity_document = { path = "../identity.rs-1/identity_document" }
+identity_credential = { path = "../identity.rs-1/identity_credential" }
+identity_storage = { path = "../identity.rs-1/identity_storage" }
+identity_eddsa_verifier = { path = "../identity.rs-1/identity_eddsa_verifier" }
+identity_iota = { path = "../identity.rs-1/identity_iota" }
+identity_iota_core = { path = "../identity.rs-1/identity_iota_core" }
+# identity_resolver = { path = "../identity.rs-1/identity_resolver" }
+
 [build-dependencies]
 cbindgen = "0.18.0"
 

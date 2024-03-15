@@ -15,6 +15,7 @@
  *
  */
 
+//use core::slice::SlicePattern;
 use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
@@ -351,12 +352,42 @@ impl Did {
     Ok(())
   }
 
-  pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<String>{     
-    let jws = self.did_document.as_ref().create_jws(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
-    Ok(jws.as_str().to_string())
+  pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<Vec<u8>>{ 
+    //println!("Content to be signed in did_sign: {:?}", message);
+    //println!("fragment is: {}", self.fragment);    
+    let sig: Vec<u8>= self.did_document.as_ref().create_sig(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
+    //println!("Full signature in did_sign is: {:?}\n\n\n", sig);
+    //println!("Sig size is {}", sig.len());
+    Ok(sig)
   }
 
-  pub async fn did_verify(&self, jws: &str, tbv: &[u8]) -> anyhow::Result<()> {
+  /* pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<String>{     
+    let jws = self.did_document.as_ref().create_jws(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
+    Ok(jws.as_str().to_string())
+  } */
+
+  pub async fn did_verify(&self, sig: &[u8], signing_input: &[u8]) -> anyhow::Result<()> {
+    //println!("Full signature in did_verify is: {:?}\n\n\n", sig);
+    //println!("Content to be verified in did_verify: {:?}", signing_input);
+    let kid = &sig[0..123];
+    //println!("kid in did_verify is {:?}", kid);
+    let signature = &sig[123..sig.len()];
+    //println!("signature in did_verify is {:?}", signature);
+    let result = self.did_document.as_ref()
+    .verify_sig(kid, signature, signing_input, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
+
+    match result {
+        Ok(()) => {
+          println!("Ok in verify signature");
+          Ok(())
+        }, // Verification successful, return Ok
+        Err(err) => {
+          println!("Error in verify signature");
+          Err(anyhow::Error::msg(format!("Signature verification failed: {}", err)))},
+    }     
+  }
+
+  /* pub async fn did_verify(&self, jws: &str, tbv: &[u8]) -> anyhow::Result<()> {
       let result = self.did_document.as_ref()
       .verify_jws(&jws, None, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
     
@@ -371,8 +402,7 @@ impl Did {
           Err(err) => {
             Err(anyhow::Error::msg(format!("JWS verification failed: {}", err)))},
       }     
-  }
-
+  } */
 }
 
 pub struct Vc {

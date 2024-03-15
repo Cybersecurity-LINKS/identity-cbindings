@@ -17,9 +17,9 @@
 
 pub mod identity_wrapper;
 
-use std::ffi::{c_char, CStr, CString};
+use std::{ffi::{c_char, CStr, CString}, os::raw::c_uchar};
 
-use identity_iota::core::{json, ToJson};
+//use identity_iota::core::{json, ToJson};
 pub use identity_wrapper::*;
 
 #[repr(C)]
@@ -112,6 +112,28 @@ pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char) -> *
 }
 
 #[no_mangle]
+pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message_len: usize) -> *mut c_uchar {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let message = unsafe {
+        std::slice::from_raw_parts(message, message_len)
+    };
+
+    //let tbs = json!({"tbs": message});
+    //let tbs_slice = tbs.to_json_vec().expect("json to vec failed");
+    //let slice = tbs_slice.as_slice();
+
+    match runtime.block_on(Did::did_sign(did, wallet, message)) {
+        Ok(mut sig ) => {
+            let s = sig.as_mut_ptr();
+            std::mem::forget(sig);
+            s
+        },
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/* #[no_mangle]
 pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message_len: usize) -> *mut c_char {
     let runtime = tokio::runtime::Runtime::new().unwrap();
 
@@ -129,9 +151,31 @@ pub extern "C" fn did_sign(wallet: &Wallet, did: &Did, message: *mut u8, message
             c_string.into_raw()},
         Err(_) => std::ptr::null_mut(),
     }
-}
+} */
 
 #[no_mangle]
+pub extern "C" fn did_verify(did: &Did, signing_input: *mut u8, signing_input_len: usize, sig: *mut u8, sig_len: usize) -> rvalue_t {
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+
+    let sigu8 = unsafe {
+        std::slice::from_raw_parts(sig, sig_len)
+    };
+
+    let signing_inputu8: &[u8] = unsafe {
+        std::slice::from_raw_parts(signing_input, signing_input_len)
+    };
+
+    /* let tbs = json!({"tbs": message});
+    let tbs_slice = tbs.to_json_vec().expect("json to vec failed");
+    let slice = tbs_slice.as_slice(); */
+
+    match runtime.block_on(Did::did_verify(did, sigu8, signing_inputu8)) {
+        Ok(_) => rvalue_t{ code: 1 },
+        Err(_) => rvalue_t{ code: 0 },
+    }
+}
+
+/* #[no_mangle]
 pub extern "C" fn did_verify(did: &Did, jws: *const c_char, tbv: *mut u8, tbv_len: usize) -> rvalue_t {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let jws = unsafe { CStr::from_ptr(jws).to_str().unwrap() };
@@ -148,7 +192,7 @@ pub extern "C" fn did_verify(did: &Did, jws: *const c_char, tbv: *mut u8, tbv_le
         Ok(_) => rvalue_t{ code: 1 },
         Err(_) => rvalue_t{ code: 0 },
     }
-}
+} */
 
 /* VC */
 
