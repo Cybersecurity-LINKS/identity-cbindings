@@ -101,11 +101,12 @@ pub unsafe extern fn free_string(ptr: *const c_char) {
 }
 
 #[no_mangle]
-pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char) -> *mut Did {
+pub extern "C" fn set_did(document: *const c_char, fragment: *const c_char, privkey: *const c_char) -> *mut Did {
     let document = unsafe { CStr::from_ptr(document).to_str().unwrap() };
     let fragment = unsafe { CStr::from_ptr(fragment).to_str().unwrap() };
+    let privkey: &str = unsafe { CStr::from_ptr(privkey).to_str().unwrap() };
     
-    match Did::set_did(document, fragment) {
+    match Did::set_did(document, fragment, privkey) {
         Ok(did) => Box::into_raw(Box::new(did)),
         Err(_) => std::ptr::null_mut(),
     }

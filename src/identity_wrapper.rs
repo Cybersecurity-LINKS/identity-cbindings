@@ -20,6 +20,9 @@ use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
+use identity_iota::storage::JwkStorage;
+use identity_iota::storage::KeyIdMemstore;
+use identity_iota::verification::jwk::Jwk;
 use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
 use identity_iota::storage::JwkDocumentExt;
 use identity_iota::storage::Storage;
@@ -38,6 +41,7 @@ use iota_sdk::types::block::address::Address;
 use iota_sdk::types::block::address::Bech32Address;
 use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
+use identity_iota::storage::storage::extra::JwkDocumentExtra;
 
 // --------------------------------------------------
 
@@ -49,12 +53,12 @@ pub struct Wallet {
   stronghold_storage: StrongholdStorage,
   address: Address,
   network: NetworkName,
-  storage: Storage<StrongholdStorage, StrongholdStorage>
+  storage: Storage<JwkMemStore, KeyIdMemstore>
 }
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
+  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
   pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
@@ -73,7 +77,7 @@ impl Wallet {
 
     let network: NetworkName = client.network_name().await?;
     
-    let storage: Storage<StrongholdStorage, StrongholdStorage> = Storage::new(stronghold_storage.clone(), stronghold_storage.clone());
+    let storage: Storage<JwkMemStore, KeyIdMemstore> = Storage::new(JwkMemStore::new(), KeyIdMemstore::new());
     
     Ok(Self { client, stronghold_storage, address, network, storage/* , vc: None, did_document: None, fragment: None, peer_did_document: None */ })
   }
@@ -197,7 +201,8 @@ impl Wallet {
 
 pub struct Did {
   did_document: IotaDocument,
-  fragment: String
+  fragment: String,
+  privkey: Option<Jwk>,
 }
 
 impl Did {
@@ -209,10 +214,12 @@ impl Did {
     //let mut document: IotaDocument = IotaDocument::new(&wallet.network);
     let mut document = IotaDocument::new(&wallet.network);
 
+    println!("Before generating DID document");
+
     // Insert a new Ed25519 verification method in the DID document.
     //let fragment = document
-    let fragment = document
-    .generate_method(
+    let keys = document
+    .generate_method_with_jwk(
       &wallet.storage,
       JwkMemStore::ED25519_KEY_TYPE,
       JwsAlgorithm::EdDSA,
@@ -220,6 +227,11 @@ impl Did {
       MethodScope::VerificationMethod,
     )
     .await?;
+
+    let privkey = keys.0;
+    let fragment = keys.1;
+
+    println!("The private key is {}", privkey.to_json()?.as_str());
 
     // Attach a new method relationship to the inserted method.
     document.attach_method_relationship(
@@ -235,9 +247,9 @@ impl Did {
     let did_document = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
     let doc_json = did_document.to_json()?;
     
-    Self::write_on_file(DID_OID, &fragment.as_str(), &doc_json, "did_document.json")?;
+    Self::write_on_file(DID_OID, &privkey.to_json()?.as_str(), &fragment.as_str(), &doc_json, "did_document.json")?;
 
-    Ok(Self { did_document, fragment })
+    Ok(Self { did_document, fragment, privkey: Some(privkey) })
 
   }
 
@@ -250,7 +262,7 @@ impl Did {
     }
 
     let fragment = String::from("Hello");
-    Ok(Self { did_document, fragment} )
+    Ok(Self { did_document, fragment, privkey: None } )
   }
 
 //   pub async fn update(&mut self) -> anyhow::Result<()> {
@@ -324,38 +336,22 @@ impl Did {
 //   }
 
   pub async fn get_did(&self) -> anyhow::Result<String> {
-      Ok(self.fragment.to_owned() + " " + &self.did_document.to_json()?)
+      Ok(self.fragment.to_owned() + " " + &self.privkey.to_json()? + " " + &self.did_document.to_json()?)
   }
 
-  pub fn set_did(did_document: &str, fragment: &str) -> anyhow::Result<Self> {
+  pub fn set_did(did_document: &str, fragment: &str, privkey: &str) -> anyhow::Result<Self> {
      let did_document = IotaDocument::from_json(did_document)?;
      let fragment = fragment.to_owned();
+     let privkey = Jwk::from_json(privkey)?;
 
-     Ok(Self {did_document, fragment})
-  }
-
-  fn write_on_file(oid: &str, fragment: &str, did_document: &str, file_path: &str) -> anyhow::Result<()> {
-
-    // Create a new file, or truncate the existing file
-    let mut file = File::create(file_path)?;
-
-    // Write the data to the file
-    file.write_all(oid.as_bytes())?;
-    file.write_all(" ".as_bytes())?;
-    file.write_all(fragment.as_bytes())?;
-    file.write_all(" ".as_bytes())?;
-    file.write_all(did_document.as_bytes())?;
-
-    // Flush the buffer to ensure the data is written immediately
-    file.flush()?;
-
-    Ok(())
+     Ok(Self {did_document, fragment, privkey: Some(privkey)})
   }
 
   pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<Vec<u8>>{ 
     //println!("Content to be signed in did_sign: {:?}", message);
-    //println!("fragment is: {}", self.fragment);    
-    let sig: Vec<u8>= self.did_document.as_ref().create_sig(&wallet.storage, &self.fragment, message, &JwsSignatureOptions::default()).await?;
+    //println!("fragment is: {}", self.fragment);
+    println!("In did_sign privkey is: {:?} ", &self.privkey.to_json());    
+    let sig: Vec<u8>= self.did_document.as_ref().create_sig(&wallet.storage, &self.privkey.clone().expect("Hello"), &self.fragment, message, &JwsSignatureOptions::default()).await?;
     //println!("Full signature in did_sign is: {:?}\n\n\n", sig);
     //println!("Sig size is {}", sig.len());
     Ok(sig)
@@ -385,6 +381,26 @@ impl Did {
           println!("Error in verify signature");
           Err(anyhow::Error::msg(format!("Signature verification failed: {}", err)))},
     }     
+  }
+
+  fn write_on_file(oid: &str, fragment: &str, privkey: &str, did_document: &str, file_path: &str) -> anyhow::Result<()> {
+
+    // Create a new file, or truncate the existing file
+    let mut file = File::create(file_path)?;
+
+    // Write the data to the file
+    file.write_all(oid.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(fragment.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(privkey.as_bytes())?;
+    file.write_all(" ".as_bytes())?;
+    file.write_all(did_document.as_bytes())?;
+
+    // Flush the buffer to ensure the data is written immediately
+    file.flush()?;
+
+    Ok(())
   }
 
   /* pub async fn did_verify(&self, jws: &str, tbv: &[u8]) -> anyhow::Result<()> {
@@ -516,7 +532,7 @@ impl Vc {
     }
 
     let fragment = String::from("Hello");
-    let peer_did = Did {did_document : peer_did_doc, fragment : fragment};
+    let peer_did = Did {did_document : peer_did_doc, fragment : fragment, privkey: None};
 
     Ok(peer_did)
   }
