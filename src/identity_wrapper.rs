@@ -15,6 +15,7 @@
  *
  */
 
+use std::time::Instant;
 //use core::slice::SlicePattern;
 use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
@@ -42,6 +43,8 @@ use iota_sdk::types::block::address::Bech32Address;
 use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
 use identity_iota::storage::storage::extra::JwkDocumentExtra;
+use std::thread;
+use core::time::Duration;
 
 // --------------------------------------------------
 
@@ -58,7 +61,7 @@ pub struct Wallet {
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
+  pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
   pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
@@ -214,8 +217,6 @@ impl Did {
     //let mut document: IotaDocument = IotaDocument::new(&wallet.network);
     let mut document = IotaDocument::new(&wallet.network);
 
-    println!("Before generating DID document");
-
     // Insert a new Ed25519 verification method in the DID document.
     //let fragment = document
     let keys = document
@@ -231,8 +232,6 @@ impl Did {
     let privkey = keys.0;
     let fragment = keys.1;
 
-    println!("The private key is {}", privkey.to_json()?.as_str());
-
     // Attach a new method relationship to the inserted method.
     document.attach_method_relationship(
       document.id().to_url().join(format!("#{fragment}"))?,
@@ -246,7 +245,7 @@ impl Did {
     // Publish the Alias Output and get the published DID document.
     let did_document = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
     let doc_json = did_document.to_json()?;
-    
+
     Self::write_on_file(DID_OID, &privkey.to_json()?.as_str(), &fragment.as_str(), &doc_json, "did_document.json")?;
 
     Ok(Self { did_document, fragment, privkey: Some(privkey) })
@@ -348,12 +347,16 @@ impl Did {
   }
 
   pub async fn did_sign(&self, wallet: &Wallet, message: &[u8]) -> anyhow::Result<Vec<u8>>{ 
-    //println!("Content to be signed in did_sign: {:?}", message);
+    //println!("Content to be signed in did_sign: {:?}\n\n", message);
     //println!("fragment is: {}", self.fragment);
-    println!("In did_sign privkey is: {:?} ", &self.privkey.to_json());    
+    //println!("In did_sign privkey is: {:?} ", &self.privkey.to_json()); 
+    let t = Instant::now();    
     let sig: Vec<u8>= self.did_document.as_ref().create_sig(&wallet.storage, &self.privkey.clone().expect("Hello"), &self.fragment, message, &JwsSignatureOptions::default()).await?;
     //println!("Full signature in did_sign is: {:?}\n\n\n", sig);
     //println!("Sig size is {}", sig.len());
+    let elapsed =  t.elapsed();
+    println!("did_sign time = {} micro", elapsed.as_micros());
+
     Ok(sig)
   }
 
@@ -363,6 +366,7 @@ impl Did {
   } */
 
   pub async fn did_verify(&self, sig: &[u8], signing_input: &[u8]) -> anyhow::Result<()> {
+    let t = Instant::now();
     //println!("Full signature in did_verify is: {:?}\n\n\n", sig);
     //println!("Content to be verified in did_verify: {:?}", signing_input);
     let kid = &sig[0..123];
@@ -371,6 +375,9 @@ impl Did {
     //println!("signature in did_verify is {:?}", signature);
     let result = self.did_document.as_ref()
     .verify_sig(kid, signature, signing_input, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
+
+    let elapsed =  t.elapsed();
+    println!("did_verify time = {} micro", elapsed.as_micros());
 
     match result {
         Ok(()) => {
@@ -493,7 +500,11 @@ impl Vc {
 
     let issuer: IotaDID = JwtCredentialValidatorUtils::extract_issuer_from_jwt(&vc)?;
 
+    let t3 = Instant::now();
     let issuer_document: IotaDocument = wallet.client.resolve_did(&issuer).await?;
+
+    let elapsed3 = t3.elapsed();
+    println!("did issuer resolve time = {} micro", elapsed3.as_micros());
 
     if issuer_document.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
@@ -526,10 +537,15 @@ impl Vc {
         None => return Err(anyhow!("holder DID not found!".to_owned())),
     };
 
+    let t4 = Instant::now();
+
     let peer_did_doc: IotaDocument = wallet.client.resolve_did(&peer_did).await?;
     if peer_did_doc.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
     }
+
+    let elapsed4 = t4.elapsed();
+    println!("endpoint did resolve time = {} micro", elapsed4.as_micros());
 
     let fragment = String::from("Hello");
     let peer_did = Did {did_document : peer_did_doc, fragment : fragment, privkey: None};
@@ -537,7 +553,7 @@ impl Vc {
     Ok(peer_did)
   }
 
-  pub fn get_vc(&self) -> anyhow::Result<String> {
+  pub fn get_vc(&self) -> anyhow::Result<String> {    
     Ok(self.vc.as_str().to_string())
   }
 
@@ -566,4 +582,5 @@ impl Vc {
 
 
   
+
 
