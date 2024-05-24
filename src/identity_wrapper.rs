@@ -21,7 +21,6 @@ use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
-use identity_iota::storage::JwkStorage;
 use identity_iota::storage::KeyIdMemstore;
 use identity_iota::verification::jwk::Jwk;
 use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
@@ -43,8 +42,6 @@ use iota_sdk::types::block::address::Bech32Address;
 use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
 use identity_iota::storage::storage::extra::JwkDocumentExtra;
-use std::thread;
-use core::time::Duration;
 
 // --------------------------------------------------
 
@@ -61,7 +58,7 @@ pub struct Wallet {
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
+  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
   pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
