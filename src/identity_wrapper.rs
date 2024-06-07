@@ -21,7 +21,6 @@ use std::{str::FromStr, fs::File, io::Write};
 use anyhow::anyhow;
 use anyhow::Context;
 use identity_eddsa_verifier::EdDSAJwsVerifier;
-use identity_iota::storage::JwkStorage;
 use identity_iota::storage::KeyIdMemstore;
 use identity_iota::verification::jwk::Jwk;
 use identity_iota::{iota::{NetworkName, IotaDID}, prelude::IotaDocument, storage::JwsSignatureOptions, verification::MethodRelationship, document::verifiable::JwsVerificationOptions, credential::{Jwt, Subject, CredentialBuilder, Credential, JwtCredentialValidator, JwtCredentialValidationOptions, FailFast, JwtCredentialValidatorUtils}, did::DID, core::{FromJson, ToJson, json, Object, OneOrMany}};
@@ -582,4 +581,5 @@ impl Vc {
 
 
   
+
 
