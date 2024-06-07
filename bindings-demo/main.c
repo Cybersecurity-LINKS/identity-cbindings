@@ -68,45 +68,46 @@ int main() {
     
     /* CREATE A DID DOCUMENT */
     Did *did = did_create(w);
-    const char *did_document = get_did(did);
-    printf("\nDID Document: %s\n", did_document);
+    //const char *did_document = get_did(did);
+    //printf("\nDID Document: %s\n", did_document);
 
     /* SIGN AN ARBITRARY MESSAGE WITH THE DID KEY */
-    char s[] = "Hello";
+    char s[] = "Zcash";
     const char *sign = did_sign(w, did, (unsigned char*)s, strlen(s));
     printf("Signature: %s\n", sign);
+
+    rvalue_t r = did_verify(did, (unsigned char*)s, strlen(s), sign, 187);
 
     /* RESOLVE THE DID */
     //TODO 
     // I should read the DID Document id from the file
-    did = did_resolve(w, "did:iota:rms:0xf66b6e320a8b794c473003cebb6534970e63d953029d0bbf48f29168aef2e079");
+    //did = did_resolve(w, "did:iota:rms:0xf66b6e320a8b794c473003cebb6534970e63d953029d0bbf48f29168aef2e079");
     
     /* VERIFY THE SIGNATURE */
     //TODO
 
     /* READ A DID DOCUMENT FROM FILE AND SET IT */
-    char* document = read_file("did_document.json");
+    /* char* document = read_file("did_document.json");
     char* fragment = read_file("fragment");
     Did *did2 = set_did(did_document, fragment);
     const char *did_document2 = get_did(did2);
-    printf("The content of the set DID Document: %s\n", did_document2);
+    printf("The content of the set DID Document: %s\n", did_document2); */
 
     /* CREATE A VC */
-    Vc *vc = vc_create(w, did, "www.server.com");
+    /* Vc *vc = vc_create(w, did, "www.server.com"); */
 
     /* GET THE VC AS A JWT */
-    const char* vc_jwt = get_vc(vc);
-    printf("\nVC as JWT:\n %s", vc_jwt);
+    /* const char* vc_jwt = get_vc(vc);
+    printf("\nVC as JWT:\n %s", vc_jwt); */
 
     /* READ VC FROM FILE AND SET IT */
-    char* vc_jwt2 = read_file("credential.jwt");
-    Vc *vc2 = set_vc(vc_jwt2);
+    /* char* vc_jwt2 = read_file("credential.jwt");
+    Vc *vc2 = set_vc(vc_jwt2); */
 
     /* VERIFY THE VC */
-    Did *peer_did = vc_verify(w, vc_jwt);
+    /* Did *peer_did = vc_verify(w, vc_jwt);
     const char *peer_did_document = get_did(peer_did);
-    printf("\nThe content of the peer DID document: %s\n", peer_did_document);
+    printf("\nThe content of the peer DID document: %s\n", peer_did_document); */
 
     return 0;
 }
-

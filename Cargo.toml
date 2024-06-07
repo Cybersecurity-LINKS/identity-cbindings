@@ -18,6 +18,8 @@ env_logger = "0.10.0"
 dotenv = "0.15.0"
 
 [patch.crates-io]
+# iota-sdk = { path = "../iota-sdk/sdk" }
+stronghold-runtime = { path = "../stronghold.rs/engine/runtime" }
 identity_stronghold = { path = "../identity.rs-1/identity_stronghold" }
 identity_core = { path = "../identity.rs-1/identity_core" }
 identity_jose = { path = "../identity.rs-1/identity_jose" }
