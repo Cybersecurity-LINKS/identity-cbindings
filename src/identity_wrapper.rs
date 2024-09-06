@@ -42,8 +42,10 @@ use iota_sdk::types::block::address::Bech32Address;
 use iota_sdk::types::block::address::Hrp;
 use iota_sdk::client::secret::stronghold::StrongholdSecretManager;
 use identity_iota::storage::storage::extra::JwkDocumentExtra;
-use std::thread;
-use core::time::Duration;
+use identity_iota::document::PlainSig;
+use identity_iota::storage::CreatePlainSig;
+//use std::thread;
+//use core::time::Duration;
 
 // --------------------------------------------------
 
@@ -60,7 +62,8 @@ pub struct Wallet {
 
 impl Wallet {
 
-  pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
+  //pub const API_ENDPOINT: &'static str = "http://192.168.94.191";
+  pub const API_ENDPOINT: &'static str = "https://api.testnet.shimmer.network";
   pub const FAUCET_ENDPOINT: &'static str = "https://faucet.testnet.shimmer.network/api/enqueue";
 
   pub async fn setup(stronghold_path: &str, password: &str) -> anyhow::Result<Self> {
@@ -74,8 +77,7 @@ impl Wallet {
     let stronghold = Self::setup_secret_manager(stronghold_path, password).await?;
     let stronghold_storage = StrongholdStorage::new(stronghold);
     
-
-    let address = Self::request_funds_for_address(None, &client, stronghold_storage.as_secret_manager(), Self::FAUCET_ENDPOINT).await?;
+    let address = Self::request_funds_for_address(None, &client, stronghold_storage.as_secret_manager(), Self::FAUCET_ENDPOINT).await.unwrap();
 
     let network: NetworkName = client.network_name().await?;
     
@@ -334,14 +336,14 @@ impl Did {
 //   }
 
   pub async fn get_did(&self) -> anyhow::Result<String> {
-      Ok(self.fragment.to_owned() + " " + &self.privkey.to_json()? + " " + &self.did_document.to_json()?)
+      Ok(self.fragment.to_owned() + " " + &self.privkey.to_json()? + " " + &self.did_document.to_json()? + " ")
   }
 
   pub fn set_did(did_document: &str, fragment: &str, privkey: &str) -> anyhow::Result<Self> {
      let did_document = IotaDocument::from_json(did_document)?;
      let fragment = fragment.to_owned();
      let privkey = Jwk::from_json(privkey)?;
-
+     
      Ok(Self {did_document, fragment, privkey: Some(privkey)})
   }
 
@@ -354,7 +356,7 @@ impl Did {
     //println!("Full signature in did_sign is: {:?}\n\n\n", sig);
     //println!("Sig size is {}", sig.len());
     let elapsed =  t.elapsed();
-    println!("did_sign time = {} micro", elapsed.as_micros());
+    println!("did_sign time = {} micro\n", elapsed.as_micros());
 
     Ok(sig)
   }
@@ -366,25 +368,25 @@ impl Did {
 
   pub async fn did_verify(&self, sig: &[u8], signing_input: &[u8]) -> anyhow::Result<()> {
     let t = Instant::now();
-    //println!("Full signature in did_verify is: {:?}\n\n\n", sig);
-    //println!("Content to be verified in did_verify: {:?}", signing_input);
+    //println!("Full signature in did_verify is: {:?}\n", sig);
+    //println!("Content to be verified in did_verify: {:?}\n", signing_input);
     let kid = &sig[0..123];
-    //println!("kid in did_verify is {:?}", kid);
+    //println!("kid in did_verify is {:?}\n", kid);
     let signature = &sig[123..sig.len()];
-    //println!("signature in did_verify is {:?}", signature);
+    //println!("signature in did_verify is {:?}\n", signature);
     let result = self.did_document.as_ref()
     .verify_sig(kid, signature, signing_input, &EdDSAJwsVerifier::default(), &JwsVerificationOptions::default());
 
     let elapsed =  t.elapsed();
-    println!("did_verify time = {} micro", elapsed.as_micros());
+    println!("did_verify time = {} micro\n", elapsed.as_micros());
 
     match result {
         Ok(()) => {
-          println!("Ok in verify signature");
+          println!("Ok in verify signature\n");
           Ok(())
         }, // Verification successful, return Ok
         Err(err) => {
-          println!("Error in verify signature");
+          println!("Error in verify signature\n");
           Err(anyhow::Error::msg(format!("Signature verification failed: {}", err)))},
     }     
   }
@@ -459,10 +461,10 @@ impl Vc {
 
     // Construct an Alias Output containing the DID document, with the wallet address
     // set as both the state controller and governor.
-    let alias_output: AliasOutput = wallet.client.new_did_output(wallet.address, issuer_document, None).await?;
+    let alias_output: AliasOutput = wallet.client.new_did_output(wallet.address, issuer_document, None).await.unwrap();
 
     // Publish the Alias Output and get the published DID document.
-    let issuer_document: IotaDocument = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await?;
+    let issuer_document: IotaDocument = wallet.client.publish_did_output(wallet.stronghold_storage.as_secret_manager(), alias_output).await.unwrap();
 
     let subject: Subject = Subject::from_json_value(json!({
       "id": did.did_document.as_ref().id().to_string(),
@@ -503,7 +505,7 @@ impl Vc {
     let issuer_document: IotaDocument = wallet.client.resolve_did(&issuer).await?;
 
     let elapsed3 = t3.elapsed();
-    println!("did issuer resolve time = {} micro", elapsed3.as_micros());
+    println!("did issuer resolve time = {} micro\n", elapsed3.as_micros());
 
     if issuer_document.metadata.deactivated.is_some_and(|v| v == true) {
       return Err(anyhow!("Deactivated DID Document"));
@@ -533,7 +535,7 @@ impl Vc {
 
     let peer_did = match peer_did {
         Some(h) => IotaDID::from_str(h)?,
-        None => return Err(anyhow!("holder DID not found!".to_owned())),
+        None => return Err(anyhow!("holder DID not found!\n".to_owned())),
     };
 
     let t4 = Instant::now();
@@ -544,7 +546,7 @@ impl Vc {
     }
 
     let elapsed4 = t4.elapsed();
-    println!("endpoint did resolve time = {} micro", elapsed4.as_micros());
+    println!("endpoint did resolve time = {} micro\n", elapsed4.as_micros());
 
     let fragment = String::from("Hello");
     let peer_did = Did {did_document : peer_did_doc, fragment : fragment, privkey: None};

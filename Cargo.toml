@@ -19,7 +19,7 @@ dotenv = "0.15.0"
 
 [patch.crates-io]
 # iota-sdk = { path = "../iota-sdk/sdk" }
-stronghold-runtime = { path = "../stronghold.rs/engine/runtime" }
+# stronghold-runtime = { path = "../stronghold.rs/engine/runtime" }
 identity_stronghold = { path = "../identity-plainsig.rs/identity_stronghold" }
 identity_core = { path = "../identity-plainsig.rs/identity_core" }
 identity_jose = { path = "../identity-plainsig.rs/identity_jose" }

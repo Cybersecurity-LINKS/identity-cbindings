@@ -1,4 +1,4 @@
-LIB=/home/pi/identity-cbindings/target/release
+LIB=/home/pirug/Desktop/identity-cbindings/target/release
 
 CC = gcc
 CFLAGS = -Wall -g
