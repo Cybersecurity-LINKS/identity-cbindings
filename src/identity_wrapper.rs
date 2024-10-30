@@ -555,7 +555,7 @@ impl Vc {
   }
 
   pub fn get_vc(&self) -> anyhow::Result<String> {    
-    Ok(self.vc.as_str().to_string())
+    Ok(self.vc.as_str().to_string() + " ")
   }
 
   pub fn set_vc(vc: &str) -> anyhow::Result<Self>{
